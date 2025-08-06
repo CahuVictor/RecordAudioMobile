@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Gravador de Áudio</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body {
       font-family: sans-serif;
@@ -17,6 +18,8 @@
       border-radius: 8px;
       border: none;
       cursor: pointer;
+      width: 80%;
+      max-width: 300px;
     }
 
     #startBtn {
@@ -39,15 +42,35 @@
       max-height: 200px;
       overflow-y: auto;
     }
+
+    #instrucoes {
+      background-color: #fff8dc;
+      padding: 10px;
+      border-radius: 6px;
+      text-align: left;
+      margin-top: 20px;
+      font-size: 16px;
+    }
   </style>
 </head>
 <body>
   <h2>🎙️ Gravador de Áudio</h2>
+  <p><strong>ℹ️ Atenção:</strong> Ao clicar em "Iniciar Gravação", permita o acesso ao microfone quando o navegador pedir.</p>
+
   <button id="startBtn">▶️ Iniciar Gravação</button>
   <button id="stopBtn" disabled>⏹️ Parar Gravação</button>
+
   <p id="status">Status: aguardando...</p>
   <div id="downloads"></div>
   <div id="logs"><strong>Logs:</strong><br></div>
+
+  <div id="instrucoes">
+    <strong>⚠️ Se a gravação não iniciar:</strong>
+    <ul>
+      <li>No <strong>Android/Chrome</strong>: vá em <em>Configurações > Sites > Microfone</em> e libere o acesso.</li>
+      <li>No <strong>iPhone/Safari</strong>: vá em <em>Ajustes > Safari > Microfone</em> e permita o acesso ao site.</li>
+    </ul>
+  </div>
 
   <script>
     let mediaRecorder;
@@ -65,23 +88,34 @@
     }
 
     startBtn.onclick = async () => {
-      log("Solicitando permissão para o microfone...");
+      log("🔍 Verificando permissão para microfone...");
+
       try {
+        const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
+        log("📋 Estado da permissão: " + permissionStatus.state);
+
+        if (permissionStatus.state === 'denied') {
+          alert('🚫 O microfone está bloqueado. Vá nas configurações do navegador para liberar o acesso.');
+          log('❌ Acesso ao microfone negado permanentemente.');
+          return;
+        }
+
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        log("Permissão concedida. Iniciando MediaRecorder...");
+        log("✅ Permissão concedida. Microfone ativo.");
+
         mediaRecorder = new MediaRecorder(stream);
         audioChunks = [];
 
         mediaRecorder.ondataavailable = event => {
           if (event.data.size > 0) {
             audioChunks.push(event.data);
-            log("Pacote de áudio capturado.");
+            log("🎤 Pacote de áudio capturado.");
           }
         };
 
         mediaRecorder.onstart = () => {
           status.textContent = "Status: gravando...";
-          log("Gravação iniciada.");
+          log("▶️ Gravação iniciada.");
         };
 
         mediaRecorder.onstop = () => {
@@ -95,15 +129,16 @@
           a.style.marginTop = "10px";
           downloads.appendChild(a);
           status.textContent = "Status: gravação encerrada.";
-          log("Gravação parada e link de download criado.");
+          log("✅ Gravação encerrada. Link de download gerado.");
         };
 
         mediaRecorder.start();
         startBtn.disabled = true;
         stopBtn.disabled = false;
+
       } catch (err) {
-        log("Erro ao acessar o microfone: " + err.message);
-        alert("Erro ao acessar o microfone. Verifique se deu permissão.");
+        log("❌ Erro ao tentar acessar o microfone: " + err.message);
+        alert("Erro ao acessar o microfone. Verifique se você deu permissão ao navegador.");
       }
     };
 

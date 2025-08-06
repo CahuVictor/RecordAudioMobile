@@ -11,6 +11,16 @@
       text-align: center;
     }
 
+    input[type="text"] {
+      font-size: 18px;
+      padding: 8px;
+      width: 80%;
+      max-width: 300px;
+      margin-bottom: 15px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+
     button {
       font-size: 20px;
       padding: 15px 30px;
@@ -55,7 +65,11 @@
 </head>
 <body>
   <h2>🎙️ Gravador de Áudio</h2>
+
   <p><strong>ℹ️ Atenção:</strong> Ao clicar em "Iniciar Gravação", permita o acesso ao microfone quando o navegador pedir.</p>
+
+  <label for="username">Seu nome (opcional):</label><br>
+  <input id="username" type="text" placeholder="Digite seu nome"><br>
 
   <button id="startBtn">▶️ Iniciar Gravação</button>
   <button id="stopBtn" disabled>⏹️ Parar Gravação</button>
@@ -121,15 +135,24 @@
         mediaRecorder.onstop = () => {
           const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
           const url = URL.createObjectURL(audioBlob);
+
+          // Gera timestamp e nome
+          const now = new Date();
+          const timestamp = now.toISOString().replace(/[:T]/g, '-').split('.')[0];
+          const usernameInput = document.getElementById("username").value.trim();
+          const sanitizedName = usernameInput ? usernameInput.toLowerCase().replace(/\s+/g, "_") : "sem_nome";
+          const filename = `gravacao_${timestamp}_${sanitizedName}.webm`;
+
           const a = document.createElement("a");
           a.href = url;
-          a.download = "gravacao.webm";
-          a.textContent = "🎧 Baixar gravação";
+          a.download = filename;
+          a.textContent = `🎧 Baixar: ${filename}`;
           a.style.display = "block";
           a.style.marginTop = "10px";
           downloads.appendChild(a);
+
           status.textContent = "Status: gravação encerrada.";
-          log("✅ Gravação encerrada. Link de download gerado.");
+          log(`✅ Gravação encerrada. Nome do arquivo: ${filename}`);
         };
 
         mediaRecorder.start();

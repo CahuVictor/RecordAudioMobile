@@ -1,15 +1,53 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
   <title>Gravador de Áudio</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      text-align: center;
+    }
+
+    button {
+      font-size: 20px;
+      padding: 15px 30px;
+      margin: 10px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+    }
+
+    #startBtn {
+      background-color: green;
+      color: white;
+    }
+
+    #stopBtn {
+      background-color: red;
+      color: white;
+    }
+
+    #logs {
+      margin-top: 20px;
+      text-align: left;
+      font-size: 16px;
+      background-color: #f1f1f1;
+      padding: 10px;
+      border-radius: 6px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+  </style>
 </head>
 <body>
-  <h2>Gravador de Áudio</h2>
+  <h2>🎙️ Gravador de Áudio</h2>
   <button id="startBtn">▶️ Iniciar Gravação</button>
   <button id="stopBtn" disabled>⏹️ Parar Gravação</button>
   <p id="status">Status: aguardando...</p>
   <div id="downloads"></div>
+  <div id="logs"><strong>Logs:</strong><br></div>
 
   <script>
     let mediaRecorder;
@@ -19,37 +57,62 @@
     const stopBtn = document.getElementById("stopBtn");
     const status = document.getElementById("status");
     const downloads = document.getElementById("downloads");
+    const logs = document.getElementById("logs");
+
+    function log(msg) {
+      logs.innerHTML += `${new Date().toLocaleTimeString()} - ${msg}<br>`;
+      logs.scrollTop = logs.scrollHeight;
+    }
 
     startBtn.onclick = async () => {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorder = new MediaRecorder(stream);
-      audioChunks = [];
+      log("Solicitando permissão para o microfone...");
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        log("Permissão concedida. Iniciando MediaRecorder...");
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
 
-      mediaRecorder.ondataavailable = event => {
-        if (event.data.size > 0) audioChunks.push(event.data);
-      };
+        mediaRecorder.ondataavailable = event => {
+          if (event.data.size > 0) {
+            audioChunks.push(event.data);
+            log("Pacote de áudio capturado.");
+          }
+        };
 
-      mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-        const url = URL.createObjectURL(audioBlob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "gravacao.webm";
-        a.textContent = "🎧 Baixar gravação";
-        downloads.appendChild(a);
-        status.textContent = "Status: gravação encerrada.";
-      };
+        mediaRecorder.onstart = () => {
+          status.textContent = "Status: gravando...";
+          log("Gravação iniciada.");
+        };
 
-      mediaRecorder.start();
-      startBtn.disabled = true;
-      stopBtn.disabled = false;
-      status.textContent = "Status: gravando...";
+        mediaRecorder.onstop = () => {
+          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+          const url = URL.createObjectURL(audioBlob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "gravacao.webm";
+          a.textContent = "🎧 Baixar gravação";
+          a.style.display = "block";
+          a.style.marginTop = "10px";
+          downloads.appendChild(a);
+          status.textContent = "Status: gravação encerrada.";
+          log("Gravação parada e link de download criado.");
+        };
+
+        mediaRecorder.start();
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+      } catch (err) {
+        log("Erro ao acessar o microfone: " + err.message);
+        alert("Erro ao acessar o microfone. Verifique se deu permissão.");
+      }
     };
 
     stopBtn.onclick = () => {
-      mediaRecorder.stop();
-      startBtn.disabled = false;
-      stopBtn.disabled = true;
+      if (mediaRecorder && mediaRecorder.state === "recording") {
+        mediaRecorder.stop();
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+      }
     };
   </script>
 </body>

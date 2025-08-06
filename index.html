@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <title>Gravador de Áudio</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <title>Gravador com Identificação</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     body {
       font-family: sans-serif;
@@ -11,20 +11,16 @@
       text-align: center;
     }
 
-    input[type="text"] {
-      font-size: 18px;
-      padding: 8px;
-      width: 80%;
-      max-width: 300px;
-      margin-bottom: 15px;
-      border-radius: 6px;
-      border: 1px solid #ccc;
+    input[type="file"] {
+      font-size: 16px;
+      margin-bottom: 10px;
     }
 
     button {
-      font-size: 20px;
-      padding: 15px 30px;
-      margin: 10px;
+      font-size: 18px;
+      padding: 12px 24px;
+      margin: 10px auto;
+      display: block;
       border-radius: 8px;
       border: none;
       cursor: pointer;
@@ -42,37 +38,37 @@
       color: white;
     }
 
-    #logs {
-      margin-top: 20px;
+    #sendEmailBtn {
+      background-color: #0047ab;
+      color: white;
+    }
+
+    #logs, #instrucoes, #infoDisplay {
       text-align: left;
       font-size: 16px;
       background-color: #f1f1f1;
       padding: 10px;
       border-radius: 6px;
-      max-height: 200px;
-      overflow-y: auto;
+      margin-top: 20px;
     }
 
-    #instrucoes {
-      background-color: #fff8dc;
-      padding: 10px;
-      border-radius: 6px;
-      text-align: left;
-      margin-top: 20px;
-      font-size: 16px;
+    #downloads a {
+      display: block;
+      margin-top: 10px;
     }
   </style>
 </head>
 <body>
-  <h2>🎙️ Gravador de Áudio</h2>
+  <h2>🎙️ Gravador de Áudio com Identificação</h2>
 
-  <p><strong>ℹ️ Atenção:</strong> Ao clicar em "Iniciar Gravação", permita o acesso ao microfone quando o navegador pedir.</p>
+  <input type="file" id="infoFile" accept=".txt" />
+  <p><strong>ℹ️ Dica:</strong> Envie um arquivo `.txt` com 3 linhas: Informação 1, Informação 2, Informação 3.</p>
 
-  <label for="username">Seu nome (opcional):</label><br>
-  <input id="username" type="text" placeholder="Digite seu nome"><br>
+  <div id="infoDisplay">📋 Nenhuma informação carregada.</div>
 
   <button id="startBtn">▶️ Iniciar Gravação</button>
   <button id="stopBtn" disabled>⏹️ Parar Gravação</button>
+  <button id="sendEmailBtn" disabled>📧 Enviar por E-mail</button>
 
   <p id="status">Status: aguardando...</p>
   <div id="downloads"></div>
@@ -89,42 +85,80 @@
   <script>
     let mediaRecorder;
     let audioChunks = [];
+    let gravacaoURL = '';
+    const infoKeys = ['info1', 'info2', 'info3'];
 
     const startBtn = document.getElementById("startBtn");
     const stopBtn = document.getElementById("stopBtn");
     const status = document.getElementById("status");
     const downloads = document.getElementById("downloads");
     const logs = document.getElementById("logs");
+    const infoFile = document.getElementById("infoFile");
+    const infoDisplay = document.getElementById("infoDisplay");
+    const sendEmailBtn = document.getElementById("sendEmailBtn");
 
     function log(msg) {
       logs.innerHTML += `${new Date().toLocaleTimeString()} - ${msg}<br>`;
       logs.scrollTop = logs.scrollHeight;
     }
 
+    function atualizarInfoNaTela() {
+      const info1 = localStorage.getItem('info1') || '';
+      const info2 = localStorage.getItem('info2') || '';
+      const info3 = localStorage.getItem('info3') || '';
+
+      if (info1 && info2 && info3) {
+        infoDisplay.innerHTML = `
+          <strong>Informações carregadas:</strong><br>
+          1️⃣ ${info1}<br>
+          2️⃣ ${info2}<br>
+          3️⃣ ${info3}
+        `;
+      } else {
+        infoDisplay.innerHTML = "📋 Nenhuma informação carregada.";
+      }
+    }
+
+    infoFile.addEventListener('change', () => {
+      const file = infoFile.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const lines = reader.result.trim().split('\n');
+        if (lines.length >= 3) {
+          localStorage.setItem('info1', lines[0].trim());
+          localStorage.setItem('info2', lines[1].trim());
+          localStorage.setItem('info3', lines[2].trim());
+          log("📄 Informações carregadas do arquivo.");
+          atualizarInfoNaTela();
+        } else {
+          alert("O arquivo precisa conter pelo menos 3 linhas.");
+        }
+      };
+      reader.readAsText(file);
+    });
+
     startBtn.onclick = async () => {
       log("🔍 Verificando permissão para microfone...");
 
       try {
         const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
-        log("📋 Estado da permissão: " + permissionStatus.state);
 
         if (permissionStatus.state === 'denied') {
-          alert('🚫 O microfone está bloqueado. Vá nas configurações do navegador para liberar o acesso.');
-          log('❌ Acesso ao microfone negado permanentemente.');
+          alert('🚫 Microfone bloqueado. Libere nas configurações do navegador.');
+          log('❌ Permissão negada permanentemente.');
           return;
         }
 
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        log("✅ Permissão concedida. Microfone ativo.");
+        log("✅ Permissão concedida.");
 
         mediaRecorder = new MediaRecorder(stream);
         audioChunks = [];
 
         mediaRecorder.ondataavailable = event => {
-          if (event.data.size > 0) {
-            audioChunks.push(event.data);
-            log("🎤 Pacote de áudio capturado.");
-          }
+          if (event.data.size > 0) audioChunks.push(event.data);
         };
 
         mediaRecorder.onstart = () => {
@@ -133,35 +167,34 @@
         };
 
         mediaRecorder.onstop = () => {
-          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-          const url = URL.createObjectURL(audioBlob);
+          const blob = new Blob(audioChunks, { type: 'audio/webm' });
+          gravacaoURL = URL.createObjectURL(blob);
 
-          // Gera timestamp e nome
           const now = new Date();
           const timestamp = now.toISOString().replace(/[:T]/g, '-').split('.')[0];
-          const usernameInput = document.getElementById("username").value.trim();
-          const sanitizedName = usernameInput ? usernameInput.toLowerCase().replace(/\s+/g, "_") : "sem_nome";
-          const filename = `gravacao_${timestamp}_${sanitizedName}.webm`;
+          const info1 = localStorage.getItem('info1') || 'seminfo1';
+          const info2 = localStorage.getItem('info2') || 'seminfo2';
+          const info3 = localStorage.getItem('info3') || 'seminfo3';
+
+          const filename = `gravacao_${timestamp}_${info1}_${info2}_${info3}.webm`.replace(/\s+/g, "_");
 
           const a = document.createElement("a");
-          a.href = url;
+          a.href = gravacaoURL;
           a.download = filename;
           a.textContent = `🎧 Baixar: ${filename}`;
-          a.style.display = "block";
-          a.style.marginTop = "10px";
           downloads.appendChild(a);
 
           status.textContent = "Status: gravação encerrada.";
-          log(`✅ Gravação encerrada. Nome do arquivo: ${filename}`);
+          log(`✅ Gravação encerrada. Arquivo: ${filename}`);
+          sendEmailBtn.disabled = false;
         };
 
         mediaRecorder.start();
         startBtn.disabled = true;
         stopBtn.disabled = false;
-
       } catch (err) {
-        log("❌ Erro ao tentar acessar o microfone: " + err.message);
-        alert("Erro ao acessar o microfone. Verifique se você deu permissão ao navegador.");
+        log("❌ Erro ao acessar microfone: " + err.message);
+        alert("Erro ao acessar o microfone. Verifique as permissões.");
       }
     };
 
@@ -172,6 +205,18 @@
         stopBtn.disabled = true;
       }
     };
+
+    sendEmailBtn.onclick = () => {
+      const info1 = localStorage.getItem('info1') || '';
+      const info2 = localStorage.getItem('info2') || '';
+      const info3 = localStorage.getItem('info3') || '';
+      const subject = encodeURIComponent(`Gravação de áudio - ${info1}`);
+      const body = encodeURIComponent(`Olá,\n\nSegue link para baixar a gravação:\n\n${gravacaoURL}\n\nInformações:\n- ${info1}\n- ${info2}\n- ${info3}\n\n*Anexe o áudio manualmente se necessário.*`);
+      window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    };
+
+    // Carregar infos salvas
+    atualizarInfoNaTela();
   </script>
 </body>
 </html>

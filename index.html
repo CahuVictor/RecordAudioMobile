@@ -2,8 +2,17 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <title>Gravador com Identificação</title>
+  <title>RecordAudioMobile</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0047ab" />
+
+  <!-- Manifesto para o PWA -->
+  <link rel="manifest" href="manifest.json" />
+
+  <!-- Ícone de atalho (fallback) -->
+  <link rel="icon" href="assets/icons/icon-192.png" sizes="192x192" type="image/png" />
+  <link rel="apple-touch-icon" href="assets/icons/icon-512.png" />
+
   <style>
     body {
       font-family: sans-serif;
@@ -28,20 +37,9 @@
       max-width: 300px;
     }
 
-    #startBtn {
-      background-color: green;
-      color: white;
-    }
-
-    #stopBtn {
-      background-color: red;
-      color: white;
-    }
-
-    #sendEmailBtn {
-      background-color: #0047ab;
-      color: white;
-    }
+    #startBtn { background-color: green; color: white; }
+    #stopBtn { background-color: red; color: white; }
+    #sendEmailBtn { background-color: #0047ab; color: white; }
 
     #logs, #instrucoes, #infoDisplay {
       text-align: left;
@@ -59,7 +57,7 @@
   </style>
 </head>
 <body>
-  <h2>🎙️ Gravador de Áudio com Identificação</h2>
+  <h2>🎙️ RecordAudioMobile</h2>
 
   <input type="file" id="infoFile" accept=".txt" />
   <p><strong>ℹ️ Dica:</strong> Envie um arquivo `.txt` com 3 linhas: Informação 1, Informação 2, Informação 3.</p>
@@ -141,10 +139,8 @@
 
     startBtn.onclick = async () => {
       log("🔍 Verificando permissão para microfone...");
-
       try {
         const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
-
         if (permissionStatus.state === 'denied') {
           alert('🚫 Microfone bloqueado. Libere nas configurações do navegador.');
           log('❌ Permissão negada permanentemente.');
@@ -192,6 +188,7 @@
         mediaRecorder.start();
         startBtn.disabled = true;
         stopBtn.disabled = false;
+
       } catch (err) {
         log("❌ Erro ao acessar microfone: " + err.message);
         alert("Erro ao acessar o microfone. Verifique as permissões.");
@@ -215,8 +212,15 @@
       window.location.href = `mailto:?subject=${subject}&body=${body}`;
     };
 
-    // Carregar infos salvas
+    // Carrega dados se já estiverem no localStorage
     atualizarInfoNaTela();
+
+    // Registra o service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./service-worker.js')
+        .then(() => console.log('✅ Service Worker registrado com sucesso.'))
+        .catch(err => console.error('❌ Falha ao registrar Service Worker:', err));
+    }
   </script>
 </body>
 </html>

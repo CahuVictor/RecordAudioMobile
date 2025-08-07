@@ -1,10 +1,222 @@
 <!DOCTYPE html>
-<html><body>
-  <button id="start">Iniciar</button>
-  <p id="log">Log: (nada ainda)</p>
-<script>
-  document.getElementById("start").onclick = async () => {
-    document.getElementById("log").textContent = "Botão clicado!";
-  };
-</script>
-</body></html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Gravador com Identificação</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      text-align: center;
+    }
+
+    input[type="file"] {
+      font-size: 16px;
+      margin-bottom: 10px;
+    }
+
+    button {
+      font-size: 18px;
+      padding: 12px 24px;
+      margin: 10px auto;
+      display: block;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      width: 80%;
+      max-width: 300px;
+    }
+
+    #startBtn {
+      background-color: green;
+      color: white;
+    }
+
+    #stopBtn {
+      background-color: red;
+      color: white;
+    }
+
+    #sendEmailBtn {
+      background-color: #0047ab;
+      color: white;
+    }
+
+    #logs, #instrucoes, #infoDisplay {
+      text-align: left;
+      font-size: 16px;
+      background-color: #f1f1f1;
+      padding: 10px;
+      border-radius: 6px;
+      margin-top: 20px;
+    }
+
+    #downloads a {
+      display: block;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h2>🎙️ Gravador de Áudio com Identificação</h2>
+
+  <input type="file" id="infoFile" accept=".txt" />
+  <p><strong>ℹ️ Dica:</strong> Envie um arquivo `.txt` com 3 linhas: Informação 1, Informação 2, Informação 3.</p>
+
+  <div id="infoDisplay">📋 Nenhuma informação carregada.</div>
+
+  <button id="startBtn">▶️ Iniciar Gravação</button>
+  <button id="stopBtn" disabled>⏹️ Parar Gravação</button>
+  <button id="sendEmailBtn" disabled>📧 Enviar por E-mail</button>
+
+  <p id="status">Status: aguardando...</p>
+  <div id="downloads"></div>
+  <div id="logs"><strong>Logs:</strong><br></div>
+
+  <div id="instrucoes">
+    <strong>⚠️ Se a gravação não iniciar:</strong>
+    <ul>
+      <li>No <strong>Android/Chrome</strong>: vá em <em>Configurações > Sites > Microfone</em> e libere o acesso.</li>
+      <li>No <strong>iPhone/Safari</strong>: vá em <em>Ajustes > Safari > Microfone</em> e permita o acesso ao site.</li>
+    </ul>
+  </div>
+
+  <script>
+    let mediaRecorder;
+    let audioChunks = [];
+    let gravacaoURL = '';
+    const infoKeys = ['info1', 'info2', 'info3'];
+
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const status = document.getElementById("status");
+    const downloads = document.getElementById("downloads");
+    const logs = document.getElementById("logs");
+    const infoFile = document.getElementById("infoFile");
+    const infoDisplay = document.getElementById("infoDisplay");
+    const sendEmailBtn = document.getElementById("sendEmailBtn");
+
+    function log(msg) {
+      logs.innerHTML += `${new Date().toLocaleTimeString()} - ${msg}<br>`;
+      logs.scrollTop = logs.scrollHeight;
+    }
+
+    function atualizarInfoNaTela() {
+      const info1 = localStorage.getItem('info1') || '';
+      const info2 = localStorage.getItem('info2') || '';
+      const info3 = localStorage.getItem('info3') || '';
+
+      if (info1 && info2 && info3) {
+        infoDisplay.innerHTML = `
+          <strong>Informações carregadas:</strong><br>
+          1️⃣ ${info1}<br>
+          2️⃣ ${info2}<br>
+          3️⃣ ${info3}
+        `;
+      } else {
+        infoDisplay.innerHTML = "📋 Nenhuma informação carregada.";
+      }
+    }
+
+    infoFile.addEventListener('change', () => {
+      const file = infoFile.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const lines = reader.result.trim().split('\n');
+        if (lines.length >= 3) {
+          localStorage.setItem('info1', lines[0].trim());
+          localStorage.setItem('info2', lines[1].trim());
+          localStorage.setItem('info3', lines[2].trim());
+          log("📄 Informações carregadas do arquivo.");
+          atualizarInfoNaTela();
+        } else {
+          alert("O arquivo precisa conter pelo menos 3 linhas.");
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    startBtn.onclick = async () => {
+      log("🔍 Verificando permissão para microfone...");
+
+      try {
+        const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
+
+        if (permissionStatus.state === 'denied') {
+          alert('🚫 Microfone bloqueado. Libere nas configurações do navegador.');
+          log('❌ Permissão negada permanentemente.');
+          return;
+        }
+
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        log("✅ Permissão concedida.");
+
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+
+        mediaRecorder.ondataavailable = event => {
+          if (event.data.size > 0) audioChunks.push(event.data);
+        };
+
+        mediaRecorder.onstart = () => {
+          status.textContent = "Status: gravando...";
+          log("▶️ Gravação iniciada.");
+        };
+
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(audioChunks, { type: 'audio/webm' });
+          gravacaoURL = URL.createObjectURL(blob);
+
+          const now = new Date();
+          const timestamp = now.toISOString().replace(/[:T]/g, '-').split('.')[0];
+          const info1 = localStorage.getItem('info1') || 'seminfo1';
+          const info2 = localStorage.getItem('info2') || 'seminfo2';
+          const info3 = localStorage.getItem('info3') || 'seminfo3';
+
+          const filename = `gravacao_${timestamp}_${info1}_${info2}_${info3}.webm`.replace(/\s+/g, "_");
+
+          const a = document.createElement("a");
+          a.href = gravacaoURL;
+          a.download = filename;
+          a.textContent = `🎧 Baixar: ${filename}`;
+          downloads.appendChild(a);
+
+          status.textContent = "Status: gravação encerrada.";
+          log(`✅ Gravação encerrada. Arquivo: ${filename}`);
+          sendEmailBtn.disabled = false;
+        };
+
+        mediaRecorder.start();
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+      } catch (err) {
+        log("❌ Erro ao acessar microfone: " + err.message);
+        alert("Erro ao acessar o microfone. Verifique as permissões.");
+      }
+    };
+
+    stopBtn.onclick = () => {
+      if (mediaRecorder && mediaRecorder.state === "recording") {
+        mediaRecorder.stop();
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+      }
+    };
+
+    sendEmailBtn.onclick = () => {
+      const info1 = localStorage.getItem('info1') || '';
+      const info2 = localStorage.getItem('info2') || '';
+      const info3 = localStorage.getItem('info3') || '';
+      const subject = encodeURIComponent(`Gravação de áudio - ${info1}`);
+      const body = encodeURIComponent(`Olá,\n\nSegue link para baixar a gravação:\n\n${gravacaoURL}\n\nInformações:\n- ${info1}\n- ${info2}\n- ${info3}\n\n*Anexe o áudio manualmente se necessário.*`);
+      window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    };
+
+    // Carregar infos salvas
+    atualizarInfoNaTela();
+  </script>
+</body>
+</html>
